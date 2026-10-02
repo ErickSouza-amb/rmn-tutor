@@ -23,3 +23,19 @@ async def db():
     await create_all()
     async with get_sessionmaker()() as session:
         yield session
+
+
+@pytest.fixture
+async def client():
+    import httpx
+
+    from app.main import create_app
+    from app.store.blob import reset_blob_store
+    from app.store.db import create_all
+
+    reset_blob_store()
+    await create_all()
+    app = create_app()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        yield c
+    reset_blob_store()
