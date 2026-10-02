@@ -32,3 +32,6 @@ coverage/
 backend/.env*
 frontend/.env*
 !backend/.env.example
+
+# executor scratch
+.superpowers/
