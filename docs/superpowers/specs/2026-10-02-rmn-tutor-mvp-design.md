@@ -87,9 +87,9 @@ backend/
 
 ### 3.1 Tabelas (Postgres, Alembic)
 
-**sessions**: `id uuid pk (v4)`, `owner_uid text idx`, `title text`, `experiment text` ('1H'), `metadata jsonb` ({frequency_mhz, solvent, molecular_formula, notes}), `exercise_id text null`, `image_blob text null`, `peaks jsonb` (Peak[]), `chem_state jsonb` (ChemState), `assist_mode text` (tutor|hint|verify|solution), `history_summary text null`, `summary_upto_seq int null`, `created_at`, `updated_at`.
+**sessions**: `id uuid pk (v4)`, `owner_uid text idx`, `title text`, `experiment text` ('1H'), `metadata jsonb` ({frequency_mhz, solvent, molecular_formula, notes}), `exercise_id text null`, `image_blob text null`, `peaks jsonb` (Peak[]), `chem_state jsonb` (ChemState), `assist_mode text` (tutor|hint|verify|solution), `turn_lock_until timestamptz null` (impede turnos concorrentes), `created_at`, `updated_at`.
 
-**messages**: `id uuid pk`, `session_id fk idx`, `seq int` (único por sessão), `role text` (user|assistant), `content jsonb` (blocos Anthropic fiéis: text, image-ref, tool_use, tool_result), `display_text text`, `mode text`, `usage jsonb` (input/output/cache tokens), `created_at`.
+**messages**: `id uuid pk`, `session_id fk idx`, `seq int` (único por sessão), `role text` (user|assistant|system), `content jsonb` (blocos Anthropic fiéis: text, image-ref, tool_use, tool_result), `display_text text`, `mode text`, `usage jsonb` (input/output/cache tokens), `created_at`.
 
 **structure_checks**: `id uuid pk`, `session_id fk`, `smiles text`, `result jsonb`, `created_at`.
 
@@ -121,9 +121,14 @@ O Claude altera o estado **somente** via `update_session_state(ops[])` com opera
 
 ### 3.4 Histórico e contexto
 
-- Sempre no contexto: system prompt (cache), definições de tools (cache), bloco de sessão (metadados, tabela de picos, ChemState, modo).
-- Histórico integral até ~40k tokens estimados; acima disso, mensagens antigas viram `history_summary` (gerado pelo Claude, persistido com `summary_upto_seq`) + últimas 10 trocas.
-- Imagem enviada em base64 apenas na primeira mensagem do usuário, com breakpoint de cache; não reenviada em turnos seguintes salvo se o cache expirar (então reenviada uma vez).
+**Histórico append-only (requisito da API atual):** os modelos atuais vinculam blocos de raciocínio ao histórico exato que os produziu; editar ou remover turnos anteriores invalida esses blocos (e contas novas recebem erro 400). Portanto:
+
+- O histórico enviado é exatamente a sequência persistida em `messages`, sem edição, resumo local ou remoção.
+- System prompt e definições de tools são estáveis (cache); nada volátil neles.
+- O contexto volátil de cada turno (metadados, tabela de picos, ChemState, modo) vai numa **mensagem de sistema no meio da conversa** (`role: "system"`) logo após a mensagem do usuário, e é persistida (cópias anteriores ficam no histórico).
+- Conversas longas usam a **compactação do lado do servidor** da API (beta `compact-2026-01-12`); os blocos de compactação retornados são persistidos como parte do conteúdo do assistente.
+- A imagem vai em base64 na primeira mensagem do usuário e é reconstruída byte a byte idêntica a cada requisição (mesmo blob re-encodado), preservando o prefixo de cache.
+- Atomicidade: a mensagem do usuário é persistida ao chegar; a mensagem de sistema do turno e as mensagens do assistente/tool_result só são persistidas juntas ao fim do turno bem-sucedido. Um turno que falha não deixa sequência inválida (usuários consecutivos são permitidos pela API).
 
 ## 4. Contratos
 
@@ -144,7 +149,7 @@ O Claude altera o estado **somente** via `update_session_state(ops[])` com opera
 | POST | `/api/sessions/{id}/messages` | `{text, mode?}` → SSE: `text_delta`, `tool_call`, `tool_result`, `state_updated`, `done`, `error` |
 | POST | `/api/sessions/{id}/structure-check` | `{smiles}` → resultado de `compare_structure_with_data` (+ `matches_answer` se exercício e modo permitir) |
 
-Posse: toda rota com `{id}` exige `session.owner_uid == rmn_uid` → senão 404.
+Acesso: o **link da sessão é a credencial** (UUID v4 não adivinhável). Quem tem o link pode abrir e continuar a sessão, em qualquer navegador. `owner_uid` serve apenas para listar "Minhas sessões" e para rate limit. Sessão inexistente → 404. Um turno em andamento na mesma sessão → 409.
 
 ### 4.2 Tools do Claude (`nmr_tools` v1)
 
@@ -178,7 +183,8 @@ Regras: nenhuma tool consulta base externa; SMILES ≤300 caracteres; números c
 
 ## 5. Tutor
 
-- **Modelo:** `TUTOR_MODEL` (padrão `claude-sonnet-5-5`, confirmar parâmetros no plano via documentação atual). `max_tokens` por turno configurável.
+- **Modelo:** `TUTOR_MODEL` (padrão `claude-sonnet-5-5`), `TUTOR_EFFORT` (padrão `medium`); raciocínio adaptativo (padrão do modelo), com blocos de raciocínio persistidos e reenviados sem alteração. `max_tokens` por turno configurável (padrão 16000).
+- **Fallback de recusa:** parâmetro `fallbacks: "default"` (beta `server-side-fallback-2026-07-01`) habilitado por padrão.
 - **System prompt:** derivado de `04-CLAUDE-TUTOR-SPEC.md` (fluxo A–F, escada de 6 pistas, tratamento de erro, linguagem de incerteza, proibições) + regras: citar picos por ID e δ; usar apenas valores da tabela/tools; declarar dado ausente; priorizar tabela sobre imagem em divergência; nunca revelar SMILES de gabarito.
 - **Modos (instrução por turno):**
   - Tutor: socrático.
@@ -192,6 +198,7 @@ Regras: nenhuma tool consulta base externa; SMILES ≤300 caracteres; números c
 
 - Segredos (`ANTHROPIC_API_KEY`, `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, `SESSION_SECRET`) só no backend/Vercel env; nunca em logs.
 - Cookie `rmn_uid`: httpOnly, Secure, SameSite=Lax, assinado (itsdangerous) com `SESSION_SECRET`.
+- Links de sessão são segredos: a UI avisa que quem tiver o link acessa a sessão.
 - Upload: magic bytes, ≤8 MB, re-encode Pillow (remove EXIF), dimensão máx. 4096 px (redimensiona).
 - Mensagem ≤4000 caracteres; rate limit 30 mensagens/h e 200/dia por uid e por IP (configurável); teto de tokens por sessão (configurável, padrão 400k input acumulado).
 - Aviso de privacidade na UI: conteúdo enviado à Anthropic; não enviar dados pessoais.
