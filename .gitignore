@@ -26,3 +26,9 @@ coverage/
 
 # local tooling output
 .playwright-mcp/
+
+# local databases / env
+*.db
+backend/.env*
+frontend/.env*
+!backend/.env.example
