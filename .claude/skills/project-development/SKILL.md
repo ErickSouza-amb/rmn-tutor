@@ -38,3 +38,6 @@ description: Use when writing or reviewing code in the RMN Tutor repository — 
 - Push em `main` → produção (Vercel Git Integration); branch/PR → preview.
 - Migrações em produção: `python -m app.admin migrate` com env de produção carregado.
 - Antes de afirmar que algo funciona em produção: health (`/api/health` com `db: ok`) e um turno real do tutor.
+
+## Ambiente e armadilhas
+Estado do projeto, ambiente Windows/Git Bash, Vercel, Neon/Blob, E2E e problemas abertos: `docs/handoff.md` (fonte de verdade; atualize ao fim da sessão).
