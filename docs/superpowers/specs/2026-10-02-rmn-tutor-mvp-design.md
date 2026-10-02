@@ -1,7 +1,7 @@
 # RMN Tutor — Design do MVP (ciclo 1)
 
 - **Data:** 2026-10-02
-- **Status:** aprovado em conversa (seções 1–5); aguardando revisão da spec escrita
+- **Status:** aprovado em conversa (seções 1–5) + revisão 1 do usuário incorporada
 - **Fontes:** `rmn-tutor-project-docs/` (00–09, CLAUDE.md)
 
 ## 1. Entendimento e escopo
@@ -39,7 +39,10 @@ Em produção na Vercel, um usuário anônimo consegue:
 | nmrglue | Hipótese a validar | **Fora do MVP** (só entra com dados brutos) |
 | RDKit na Vercel (tamanho, cold start) | Hipótese a validar | **Spike na Tarefa 1** |
 | SSE de longa duração no FastAPI via Vercel Services | Hipótese a validar | **Spike na Tarefa 1** |
-| Valores químicos dos exercícios | Hipótese a validar | Revisão humana (professor/usuário) antes de uso com alunos |
+| Valores químicos dos exercícios | Hipótese a validar | **Não revisados neste ciclo**; marcados `reviewed: false` + checklist em `docs/exercises/REVIEW.md` para revisão posterior do usuário |
+| Repositório / CI | Questão aberta | **GitHub + Git Integration da Vercel** (deploy automático: push em `main` → produção, PR → preview) |
+| Retenção de sessões | Questão aberta | **Indefinida; limpeza manual pelo usuário via script `admin`** (§6.1) |
+| Skill `nmr-spectroscopy` | Proposta inicial | **No escopo**, com pesquisa e citação de fontes (§10.1) |
 
 ## 2. Arquitetura
 
@@ -195,6 +198,23 @@ Regras: nenhuma tool consulta base externa; SMILES ≤300 caracteres; números c
 - Logs JSON estruturados: `request_id`, `session_id`, rota, latência, tokens, tools chamadas, erro; sem corpo de mensagens em nível INFO.
 - Vercel Analytics no frontend; runtime logs da Vercel.
 
+### 6.1 Limpeza manual de sessões
+
+Script de administração executado localmente pelo usuário (credenciais via `vercel env pull`):
+
+```bash
+cd backend
+python -m app.admin list   [--older-than 30d] [--exercise ID]       # lista id, título, criada, nº msgs
+python -m app.admin delete --session <uuid> [--yes]                 # apaga 1 sessão
+python -m app.admin purge  --older-than 30d [--dry-run] [--yes]     # apaga em lote
+python -m app.admin stats                                           # contagem, tokens acumulados
+```
+
+- Apaga em cascata: mensagens, structure_checks e o blob da imagem.
+- Sempre mostra o que será apagado e pede confirmação (salvo `--yes`); `--dry-run` não altera nada.
+- Purga também `rate_events` com mais de 2 dias.
+- Documentado em `docs/operations/limpeza-de-sessoes.md`.
+
 ## 7. Exercícios curados
 
 Cinco exercícios ¹H (CDCl₃, 400 MHz, **dados didáticos simulados**) em YAML, cada um com: título, dificuldade, fórmula molecular, picos (δ, integral, multiplicidade, J), SMILES de resposta (nunca enviado ao front nem ao contexto do Claude).
@@ -205,7 +225,12 @@ Cinco exercícios ¹H (CDCl₃, 400 MHz, **dados didáticos simulados**) em YAML
 4. tolueno
 5. 4'-metoxiacetofenona
 
-O plot e uma imagem PNG gerada no backend vêm da simulação Lorentziana dos picos, com desdobramento de primeira ordem pelos J. Valores devem ser revisados por especialista antes de uso com alunos (risco R4).
+O plot e uma imagem PNG gerada no backend vêm da simulação Lorentziana dos picos, com desdobramento de primeira ordem pelos J.
+
+**Revisão adiada (decisão do usuário):** os dados não são conferidos neste ciclo.
+- Cada YAML leva `reviewed: false`, `reviewed_by: null`, `sources: []`.
+- A UI exibe o selo "dados não revisados" enquanto `reviewed: false`.
+- `docs/exercises/REVIEW.md` reúne, por exercício, a tabela de picos, o SMILES, a fórmula, a imagem gerada e um checklist (δ, integral, multiplicidade, J, solvente), para o usuário conferir e então marcar `reviewed: true`.
 
 ## 8. Testes
 
@@ -224,11 +249,12 @@ O plot e uma imagem PNG gerada no backend vêm da simulação Lorentziana dos pi
 
 ## 9. Deploy
 
-- Git local na raiz `D:\Projeto NMR`; GitHub opcional.
+- Git na raiz `D:\Projeto NMR`, publicado em repositório **GitHub** (nome proposto `rmn-tutor`, visibilidade a confirmar na criação). Requer GitHub CLI (`gh`) instalado e `gh auth login` feito pelo usuário.
+- **Git Integration da Vercel:** projeto Vercel conectado ao repositório; push em `main` → deploy de produção; cada PR/branch → preview.
 - Projeto Vercel `rmn-tutor`, time `erick-0f6f`, `vercel.json` com `services` (frontend, backend) e rewrites `/api/(.*)` → backend.
 - Postgres via Vercel Marketplace (provedor confirmado no provisionamento); Blob privado.
 - `ANTHROPIC_API_KEY` inserida pelo usuário (`vercel env add`); nunca lida/gravada pelo agente.
-- Preview → verificação E2E na URL → produção.
+- Preview (branch) → verificação E2E na URL → merge em `main` → produção.
 - Requer Vercel CLI (`npm i -g vercel`).
 
 ## 10. Fora do escopo do ciclo 1
@@ -238,7 +264,18 @@ O plot e uma imagem PNG gerada no backend vêm da simulação Lorentziana dos pi
 - Servidor NMR MCP separado.
 - Login, modo professor, métricas pedagógicas, avaliação com estudantes.
 - i18n além de pt-BR.
-- Skill completa `nmr-spectroscopy` (exige pesquisa de fontes); neste ciclo apenas `nmr-tutor` e `project-development` enxutas.
+
+### 10.1 Skills do projeto (no escopo)
+
+Criadas com o fluxo `superpowers:writing-skills` (testar a skill antes de consolidar):
+
+- `.claude/skills/nmr-spectroscopy/`: `SKILL.md`, `proton-nmr.md`, `carbon-nmr.md`, `coupling.md`, `2d-nmr.md`, `structure-elucidation.md`.
+  - Conteúdo pesquisado em fontes confiáveis (IUPAC, livros-texto de referência, material didático universitário, documentação de bancos como SDBS/NMRShiftDB apenas como referência).
+  - Cada arquivo com seção **Fontes** (citação + URL quando houver).
+  - Faixas numéricas marcadas como aproximadas; limitações de inferência explícitas.
+  - Conteúdo químico também não revisado por especialista: mesmo selo e entrada em `docs/exercises/REVIEW.md` (seção "Skill").
+- `.claude/skills/nmr-tutor/`: questionamento socrático, escada de pistas, correção de erros, estado químico.
+- `.claude/skills/project-development/`: convenções de arquitetura, testes, segurança e deploy deste repositório.
 
 ## 11. Riscos
 
@@ -251,8 +288,15 @@ O plot e uma imagem PNG gerada no backend vêm da simulação Lorentziana dos pi
 | R5 | Custo de API sem login | Rate limit + teto de tokens por sessão |
 | R6 | Heurística de ambientes de H por simetria canônica falhar em casos de diastereotopia/troca | Check rotulado `heuristic`/`inconclusive`; tutor instruído a não tratar como prova |
 
-## 12. Questões para decisão humana (pendentes)
+## 12. Decisões humanas
 
-1. Quem revisará os dados químicos dos 5 exercícios antes de uso com alunos?
-2. Haverá repositório GitHub (para CI/Git integration na Vercel) ou deploy via CLI?
-3. Política de retenção de sessões (padrão proposto: indefinida no MVP, limpeza manual).
+Resolvidas em 2026-10-02:
+
+1. Exercícios: sem revisão neste ciclo; checklist salvo para revisão posterior (§7).
+2. GitHub + deploy automático pela Vercel (§9).
+3. Sessões guardadas; limpeza manual facilitada por script (§6.1).
+4. Skill `nmr-spectroscopy` no escopo, com pesquisa de fontes (§10.1).
+
+Pendentes (não bloqueiam o plano):
+
+- Visibilidade do repositório GitHub (público/privado), perguntada na criação.
