@@ -1,0 +1,15 @@
+id: ex03
+title: "Exercício 3 — C₄H₈O"
+difficulty: 2
+experiment: "1H"
+metadata: {frequency_mhz: 400, solvent: CDCl3, molecular_formula: C4H8O}
+answer_smiles: CCC(C)=O
+answer_name: 2-butanona
+reviewed: false
+reviewed_by: null
+sources: []
+notes: "Dados didáticos simulados (valores típicos de literatura, não revisados)."
+peaks:
+  - {ppm: 2.44, integral: 2, multiplicity: q, j_hz: [7.3]}
+  - {ppm: 2.14, integral: 3, multiplicity: s}
+  - {ppm: 1.06, integral: 3, multiplicity: t, j_hz: [7.3]}

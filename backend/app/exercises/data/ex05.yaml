@@ -1,0 +1,16 @@
+id: ex05
+title: "Exercício 5 — C₉H₁₀O₂"
+difficulty: 4
+experiment: "1H"
+metadata: {frequency_mhz: 400, solvent: CDCl3, molecular_formula: C9H10O2}
+answer_smiles: COc1ccc(cc1)C(C)=O
+answer_name: 4'-metoxiacetofenona
+reviewed: false
+reviewed_by: null
+sources: []
+notes: "Dados didáticos simulados (valores típicos de literatura, não revisados). Sistema aromático AA'BB' representado como dois dubletos."
+peaks:
+  - {ppm: 7.94, integral: 2, multiplicity: d, j_hz: [8.9]}
+  - {ppm: 6.93, integral: 2, multiplicity: d, j_hz: [8.9]}
+  - {ppm: 3.87, integral: 3, multiplicity: s}
+  - {ppm: 2.56, integral: 3, multiplicity: s}
