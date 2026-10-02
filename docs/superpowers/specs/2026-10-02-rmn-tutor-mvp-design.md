@@ -142,7 +142,7 @@ O Claude altera o estado **somente** via `update_session_state(ops[])` com opera
 | GET | `/api/sessions` | → sessões do `rmn_uid` (id, title, updated_at) |
 | GET | `/api/sessions/{id}` | → sessão + peaks + chem_state + mensagens (`display_text`, role, mode) |
 | PATCH | `/api/sessions/{id}` | `{metadata?, peaks?, assist_mode?, title?}` → sessão |
-| POST | `/api/sessions/{id}/image` | multipart `file` → `{ok}`; magic bytes PNG/JPEG/WebP, ≤8 MB, re-encode Pillow |
+| POST | `/api/sessions/{id}/image` | multipart `file` → `{ok}`; magic bytes PNG/JPEG/WebP, ≤4 MB, re-encode Pillow |
 | GET | `/api/sessions/{id}/image` | → bytes da imagem (só o dono) |
 | POST | `/api/peaks/parse` | `{text}` → `{peaks: Peak[], errors: [{line, message}]}` |
 | GET | `/api/sessions/{id}/spectrum` | → `{x: ppm[], y: number[], peaks}` simulado |
@@ -199,7 +199,7 @@ Regras: nenhuma tool consulta base externa; SMILES ≤300 caracteres; números c
 - Segredos (`ANTHROPIC_API_KEY`, `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, `SESSION_SECRET`) só no backend/Vercel env; nunca em logs.
 - Cookie `rmn_uid`: httpOnly, Secure, SameSite=Lax, assinado (itsdangerous) com `SESSION_SECRET`.
 - Links de sessão são segredos: a UI avisa que quem tiver o link acessa a sessão.
-- Upload: magic bytes, ≤8 MB, re-encode Pillow (remove EXIF), dimensão máx. 4096 px (redimensiona).
+- Upload: magic bytes, ≤4 MB no servidor (limite de 4,5 MB do corpo de requisição das Vercel Functions; o navegador reduz imagens maiores para ≤2048 px antes de enviar), re-encode Pillow (remove EXIF), dimensão máx. 2048 px (redimensiona).
 - Mensagem ≤4000 caracteres; rate limit 30 mensagens/h e 200/dia por uid e por IP (configurável); teto de tokens por sessão (configurável, padrão 400k input acumulado).
 - Aviso de privacidade na UI: conteúdo enviado à Anthropic; não enviar dados pessoais.
 - Logs JSON estruturados: `request_id`, `session_id`, rota, latência, tokens, tools chamadas, erro; sem corpo de mensagens em nível INFO.

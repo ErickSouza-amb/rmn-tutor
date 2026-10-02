@@ -23,3 +23,6 @@ Thumbs.db
 playwright-report/
 test-results/
 coverage/
+
+# local tooling output
+.playwright-mcp/
