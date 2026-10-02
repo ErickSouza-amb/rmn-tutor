@@ -14,3 +14,12 @@ def _test_env(monkeypatch, tmp_path):
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
+
+
+@pytest.fixture
+async def db():
+    from app.store.db import create_all, get_sessionmaker
+
+    await create_all()
+    async with get_sessionmaker()() as session:
+        yield session
