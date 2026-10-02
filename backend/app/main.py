@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.routes_messages import router as messages_router
 from app.api.routes_misc import router as misc_router
 from app.api.routes_sessions import router as sessions_router
 from app.config import get_settings
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     install_error_handlers(app)
     app.include_router(misc_router, prefix="/api")
     app.include_router(sessions_router, prefix="/api")
+    app.include_router(messages_router, prefix="/api")
     return app
 
 

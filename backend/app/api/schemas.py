@@ -127,3 +127,8 @@ def session_out(row: SessionRow, messages: list[MessageRow]) -> SessionOut:
             if m.display_text is not None and m.role in ("user", "assistant")
         ],
     )
+
+
+class PostMessageIn(BaseModel):
+    text: str = Field(min_length=1, max_length=20000)
+    mode: AssistMode | None = None
