@@ -1,0 +1,15 @@
+id: ex02
+title: "Exercício 2 — C₄H₈O₂"
+difficulty: 2
+experiment: "1H"
+metadata: {frequency_mhz: 400, solvent: CDCl3, molecular_formula: C4H8O2}
+answer_smiles: CCOC(C)=O
+answer_name: acetato de etila
+reviewed: false
+reviewed_by: null
+sources: []
+notes: "Dados didáticos simulados (valores típicos de literatura, não revisados)."
+peaks:
+  - {ppm: 4.12, integral: 2, multiplicity: q, j_hz: [7.1]}
+  - {ppm: 2.05, integral: 3, multiplicity: s}
+  - {ppm: 1.26, integral: 3, multiplicity: t, j_hz: [7.1]}

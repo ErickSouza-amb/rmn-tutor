@@ -1,0 +1,15 @@
+id: ex01
+title: "Exercício 1 — C₂H₆O"
+difficulty: 1
+experiment: "1H"
+metadata: {frequency_mhz: 400, solvent: CDCl3, molecular_formula: C2H6O}
+answer_smiles: CCO
+answer_name: etanol
+reviewed: false
+reviewed_by: null
+sources: []
+notes: "Dados didáticos simulados (valores típicos de literatura, não revisados). O sinal de OH varia com concentração e umidade."
+peaks:
+  - {ppm: 3.69, integral: 2, multiplicity: q, j_hz: [7.0]}
+  - {ppm: 2.00, integral: 1, multiplicity: br_s, note: "posição variável"}
+  - {ppm: 1.22, integral: 3, multiplicity: t, j_hz: [7.0]}

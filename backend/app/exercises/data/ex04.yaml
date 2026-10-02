@@ -1,0 +1,15 @@
+id: ex04
+title: "Exercício 4 — C₇H₈"
+difficulty: 3
+experiment: "1H"
+metadata: {frequency_mhz: 400, solvent: CDCl3, molecular_formula: C7H8}
+answer_smiles: Cc1ccccc1
+answer_name: tolueno
+reviewed: false
+reviewed_by: null
+sources: []
+notes: "Dados didáticos simulados (valores típicos de literatura, não revisados). A região aromática aparece como multipletos sobrepostos."
+peaks:
+  - {ppm: 7.25, integral: 2, multiplicity: m}
+  - {ppm: 7.15, integral: 3, multiplicity: m}
+  - {ppm: 2.36, integral: 3, multiplicity: s}
