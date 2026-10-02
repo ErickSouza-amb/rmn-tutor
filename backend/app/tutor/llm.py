@@ -106,7 +106,12 @@ class FakeLLM:
         yield LLMEvent("final", message=copy.deepcopy(message))
 
 
+def tutor_mode(settings: Settings) -> str:
+    """'simulated' (FakeLLM) unless a key is configured and FAKE_LLM is off."""
+    return "simulated" if settings.fake_llm or not settings.anthropic_api_key else "claude"
+
+
 def get_llm(settings: Settings) -> LLMClient:
-    if settings.fake_llm or not settings.anthropic_api_key:
+    if tutor_mode(settings) == "simulated":
         return FakeLLM()
     return AnthropicLLM(settings)

@@ -8,6 +8,7 @@ from app.api.schemas import ParseErrorOut, ParsePeaksIn, ParsePeaksOut
 from app.config import get_settings
 from app.exercises.catalog import load_exercises
 from app.nmr_engine.parser import parse_peak_text
+from app.tutor.llm import tutor_mode
 
 router = APIRouter()
 
@@ -19,7 +20,14 @@ async def health(db: AsyncSession = Depends(get_db)) -> dict:
         db_status = "ok"
     except Exception:
         db_status = "error"
-    return {"status": "ok", "version": get_settings().app_version, "rdkit": rdkit.__version__, "db": db_status}
+    settings = get_settings()
+    return {
+        "status": "ok",
+        "version": settings.app_version,
+        "rdkit": rdkit.__version__,
+        "db": db_status,
+        "tutor": tutor_mode(settings),
+    }
 
 
 @router.get("/exercises")
