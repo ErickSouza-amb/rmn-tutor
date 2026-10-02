@@ -67,3 +67,24 @@ def test_usage_errors():
     with pytest.raises(SystemExit) as exc:
         main(["purge"])
     assert exc.value.code == 2
+
+
+def test_list_survives_non_utf8_console(monkeypatch):
+    import asyncio
+    import io
+    import sys
+
+    async def make():
+        await create_all()
+        async with get_sessionmaker()() as db:
+            await repo.create_session(
+                db, owner_uid="u", title="Exercício 3 — C₄H₈O", experiment="1H", metadata={}, peaks=[],
+                exercise_id="ex03", chem_state=ChemState().model_dump(),
+            )
+
+    asyncio.run(make())
+    buf = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(buf, encoding="cp1252"))
+    assert main(["list"]) == 0
+    sys.stdout.flush()
+    assert b"C" in buf.getvalue()

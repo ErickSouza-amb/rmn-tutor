@@ -135,6 +135,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None, *, input_fn=input) -> int:
+    # Windows consoles default to cp1252; titles like "C₄H₈O" must not crash the CLI
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     args = build_parser().parse_args(argv)
     if args.command == "migrate":
         return _migrate()
