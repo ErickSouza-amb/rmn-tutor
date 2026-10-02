@@ -4,19 +4,26 @@ import { api } from "@/lib/api";
 import { MULTIPLICITIES, type Multiplicity, type ParseResult, type Peak } from "@/lib/types";
 import { useState } from "react";
 
-function parseNumber(text: string): number | null {
-  const t = text.trim().replace(",", ".");
+/** Number with dot or Brazilian decimal comma; `undefined` means invalid input, `null` means empty. */
+function parseNumber(text: string): number | null | undefined {
+  const t = text.trim().replace(/(\d),(\d)/, "$1.$2");
   if (!t) return null;
   const n = Number(t);
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) ? n : undefined;
 }
 
-function parseJ(text: string): number[] | null {
-  const values = text
-    .split(/[;\s]+/)
-    .map((v) => parseNumber(v))
-    .filter((v): v is number => v !== null);
-  return values.length ? values : null;
+function parseIntegral(text: string): number | null | undefined {
+  return parseNumber(text.trim().replace(/\s*H$/i, ""));
+}
+
+/** Same rule as the backend parser: with dot decimals commas separate values; otherwise only ";", spaces or ", ". */
+function parseJ(text: string): number[] | null | undefined {
+  const t = text.trim().replace(/\s*Hz$/i, "");
+  if (!t) return null;
+  const parts = (/\d\.\d/.test(t) ? t.split(/[;,\s]+/) : t.split(/;|\s+|,(?=\s)/)).filter((p) => p !== "");
+  const values = parts.map((p) => parseNumber(p));
+  if (values.some((v) => v === undefined || v === null)) return undefined;
+  return values as number[];
 }
 
 function formatJ(j: number[] | null): string {
@@ -40,7 +47,18 @@ export function PeakTableEditor({
   const [paste, setPaste] = useState("");
   const [errors, setErrors] = useState<ParseResult["errors"]>([]);
   const [busy, setBusy] = useState(false);
-  const [jDrafts, setJDrafts] = useState<Record<string, string>>({});
+  // raw text per cell ("P1:ppm"); the table always shows what the student typed, and invalid cells are flagged
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const draftOf = (id: string, field: string, fallback: string) => drafts[`${id}:${field}`] ?? fallback;
+  const isInvalid = (id: string, field: string, parse: (t: string) => unknown) => {
+    const raw = drafts[`${id}:${field}`];
+    return raw !== undefined && parse(raw) === undefined;
+  };
+  function editCell<T>(id: string, field: string, text: string, parse: (t: string) => T | undefined, apply: (v: T) => Partial<Peak>) {
+    setDrafts((d) => ({ ...d, [`${id}:${field}`]: text }));
+    const value = parse(text);
+    if (value !== undefined) update(id, apply(value));
+  }
 
   const update = (id: string, patch: Partial<Peak>) => onChange(peaks.map((p) => (p.id === id ? { ...p, ...patch } : p)));
 
@@ -50,7 +68,7 @@ export function PeakTableEditor({
       const result = await parse(paste);
       setErrors(result.errors);
       if (result.peaks.length) {
-        setJDrafts({});
+        setDrafts({});
         onChange(result.peaks);
       }
     } catch (e) {
@@ -107,22 +125,23 @@ export function PeakTableEditor({
               <td className="pr-2">
                 <input
                   aria-label={`δ de ${p.id}`}
-                  className={cell}
+                  aria-invalid={isInvalid(p.id, "ppm", parseNumber) || drafts[`${p.id}:ppm`] === ""}
+                  className={`${cell} aria-[invalid=true]:border-bad`}
                   inputMode="decimal"
-                  defaultValue={String(p.ppm)}
-                  onChange={(e) => {
-                    const v = parseNumber(e.target.value);
-                    if (v !== null) update(p.id, { ppm: v });
-                  }}
+                  value={draftOf(p.id, "ppm", String(p.ppm))}
+                  onChange={(e) =>
+                    editCell(p.id, "ppm", e.target.value, (t) => parseNumber(t) ?? undefined, (v: number) => ({ ppm: v }))
+                  }
                 />
               </td>
               <td className="pr-2">
                 <input
                   aria-label={`Integral de ${p.id}`}
-                  className={cell}
+                  aria-invalid={isInvalid(p.id, "integral", parseIntegral)}
+                  className={`${cell} aria-[invalid=true]:border-bad`}
                   inputMode="decimal"
-                  defaultValue={p.integral ?? ""}
-                  onChange={(e) => update(p.id, { integral: parseNumber(e.target.value) })}
+                  value={draftOf(p.id, "integral", p.integral === null ? "" : String(p.integral))}
+                  onChange={(e) => editCell(p.id, "integral", e.target.value, parseIntegral, (v) => ({ integral: v }))}
                 />
               </td>
               <td className="pr-2">
@@ -143,12 +162,10 @@ export function PeakTableEditor({
               <td className="pr-2">
                 <input
                   aria-label={`J de ${p.id}`}
-                  className={cell}
-                  value={jDrafts[p.id] ?? formatJ(p.j_hz)}
-                  onChange={(e) => {
-                    setJDrafts({ ...jDrafts, [p.id]: e.target.value });
-                    update(p.id, { j_hz: parseJ(e.target.value) });
-                  }}
+                  aria-invalid={isInvalid(p.id, "j", parseJ)}
+                  className={`${cell} aria-[invalid=true]:border-bad`}
+                  value={draftOf(p.id, "j", formatJ(p.j_hz))}
+                  onChange={(e) => editCell(p.id, "j", e.target.value, parseJ, (v) => ({ j_hz: v }))}
                 />
               </td>
               <td>

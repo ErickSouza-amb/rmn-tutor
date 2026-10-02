@@ -128,3 +128,10 @@ def test_unknown_tool_and_bad_input():
     assert execute_tool("rm_rf", {}, ctx()).result["error"]["code"] == "unknown_tool"
     assert execute_tool("get_peaks_in_region", {"ppm_start": "x"}, ctx()).result["error"]["code"] == "invalid_input"
     assert execute_tool("get_peaks_in_region", "not a dict", ctx()).result["error"]["code"] == "invalid_input"
+
+
+def test_image_only_session_delta_and_j_not_available():
+    c = ctx(peaks=[])
+    for name, args in [("calculate_delta", {"peak_a": "P1", "peak_b": "P2"}), ("calculate_j", {"peak_id": "P1"})]:
+        r = execute_tool(name, args, c).result
+        assert r["ok"] and r["data"]["status"] == "not_available", name

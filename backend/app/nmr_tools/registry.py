@@ -184,6 +184,8 @@ def _t_integration(ctx: ToolContext, inp: RegionInput) -> ToolOutcome:
 
 
 def _t_delta(ctx: ToolContext, inp: TwoPeaksInput) -> ToolOutcome:
+    if not ctx.peaks:
+        return ToolOutcome(not_available("calculate_delta", NO_PEAKS_REASON))
     a = find_peak(ctx.peaks, peak_id=inp.peak_a)
     b = find_peak(ctx.peaks, peak_id=inp.peak_b)
     missing = [pid for pid, p in ((inp.peak_a, a), (inp.peak_b, b)) if p is None]
@@ -196,6 +198,8 @@ def _t_delta(ctx: ToolContext, inp: TwoPeaksInput) -> ToolOutcome:
 
 
 def _t_j(ctx: ToolContext, inp: PeakIdInput) -> ToolOutcome:
+    if not ctx.peaks:
+        return ToolOutcome(not_available("calculate_j", NO_PEAKS_REASON, [J_LIMITATION]))
     p = find_peak(ctx.peaks, peak_id=inp.peak_id)
     if p is None:
         return ToolOutcome(error("calculate_j", "unknown_peak", f"Pico desconhecido: {inp.peak_id}."))

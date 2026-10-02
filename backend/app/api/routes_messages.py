@@ -28,13 +28,16 @@ def sse(event: str, data: dict) -> bytes:
 
 async def enforce_rate_limit(db: AsyncSession, identity: Identity, settings: Settings) -> None:
     now = repo.utcnow()
-    keys = (f"uid:{identity.uid}", f"ip:{identity.ip}")
-    for key in keys:
-        if await repo.count_rate_events(db, key, now - timedelta(hours=1)) >= settings.rate_limit_per_hour:
+    limits = (
+        (f"uid:{identity.uid}", settings.rate_limit_per_hour, settings.rate_limit_per_day),
+        (f"ip:{identity.ip}", settings.rate_limit_ip_per_hour, settings.rate_limit_ip_per_day),
+    )
+    for key, per_hour, per_day in limits:
+        if await repo.count_rate_events(db, key, now - timedelta(hours=1)) >= per_hour:
             raise ApiError(429, "rate_limited", "Muitas mensagens em pouco tempo. Aguarde alguns minutos e tente de novo.")
-        if await repo.count_rate_events(db, key, now - timedelta(days=1)) >= settings.rate_limit_per_day:
+        if await repo.count_rate_events(db, key, now - timedelta(days=1)) >= per_day:
             raise ApiError(429, "rate_limited", "Limite diário de mensagens atingido. Tente novamente amanhã.")
-    for key in keys:
+    for key, _, _ in limits:
         await repo.record_rate_event(db, key)
 
 

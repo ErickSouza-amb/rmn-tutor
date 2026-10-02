@@ -201,3 +201,14 @@ async def test_tool_iteration_limit(sm, monkeypatch):
     events = await _run(sm, sid, "Oi", FakeLLM([dict(loop_msg), dict(loop_msg), dict(loop_msg)]))
     assert events[-1].event == "done"
     assert "limite" in events[-1].data["text"].lower()
+
+
+async def test_tool_use_with_non_tool_stop_reason_is_a_failed_turn(sm):
+    sid = await _session(sm)
+    script = [
+        {"content": [{"type": "tool_use", "id": "toolu_t", "name": "get_peak_list", "input": {}}],
+         "stop_reason": "max_tokens", "usage": {}},
+    ]
+    events = await _run(sm, sid, "Oi", FakeLLM(script))
+    assert events[-1].event == "error"
+    assert [r.role for r in await _rows(sm, sid)] == ["user"]

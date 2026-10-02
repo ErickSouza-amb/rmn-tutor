@@ -117,6 +117,10 @@ async def run_turn(
                 if stop == "pause_turn":
                     continue
                 tool_uses = [b for b in content if isinstance(b, dict) and b.get("type") == "tool_use"]
+                if tool_uses and stop != "tool_use":
+                    # e.g. max_tokens mid tool call: persisting a tool_use without its tool_result
+                    # would make every later request invalid (history is append-only)
+                    raise LLMError(f"tool_use with stop_reason={stop}")
                 if stop != "tool_use" or not tool_uses:
                     if stop == "refusal":
                         texts.append("Não posso continuar com esse pedido. Vamos voltar à interpretação do espectro?")

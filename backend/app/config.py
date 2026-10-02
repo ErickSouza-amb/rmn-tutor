@@ -24,6 +24,9 @@ class Settings(BaseSettings):
 
     rate_limit_per_hour: int = 30
     rate_limit_per_day: int = 200
+    # one campus NAT IP is shared by a whole class, so the IP limit is much higher than the per-student one
+    rate_limit_ip_per_hour: int = 300
+    rate_limit_ip_per_day: int = 2000
     session_input_token_cap: int = 400_000
     max_upload_bytes: int = 4 * 1024 * 1024  # Vercel Functions cap request bodies at 4.5 MB
     max_message_chars: int = 4000

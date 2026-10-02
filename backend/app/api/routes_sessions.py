@@ -25,6 +25,7 @@ from app.store.blob import get_blob_store
 from app.store.images import ImageError, normalize_image
 from app.store.models import SessionRow
 from app.store.repo import as_aware
+from app.tutor.context import has_image_marker
 
 router = APIRouter()
 
@@ -87,8 +88,12 @@ async def update_session(
     if row.exercise_id and (body.peaks is not None or body.metadata is not None):
         raise ApiError(409, "exercise_read_only", "Picos e metadados de exercícios não podem ser alterados.")
     if body.peaks is not None:
-        PeakList(peaks=body.peaks)
-        row.peaks = _peaks_json(renumber(body.peaks))
+        try:
+            PeakList(peaks=body.peaks)
+        except ValueError as exc:
+            raise ApiError(422, "invalid_peaks", "IDs de pico duplicados.") from exc
+        # keep IDs: the tutor's notes and hypotheses cite them (only creation renumbers)
+        row.peaks = _peaks_json(sorted(body.peaks, key=lambda p: -p.ppm))
     if body.metadata is not None:
         row.meta = body.metadata.model_dump(exclude_none=True)
     if body.assist_mode is not None:
@@ -105,6 +110,10 @@ async def upload_image(
 ) -> dict:
     if row.exercise_id:
         raise ApiError(409, "exercise_read_only", "Sessões de exercício já têm imagem.")
+    if any(has_image_marker(m.content) for m in await repo.list_messages(db, row.id)):
+        raise ApiError(
+            409, "image_locked", "A imagem já foi enviada ao tutor nesta conversa; crie uma nova sessão para trocá-la."
+        )
     settings = get_settings()
     data = await file.read(settings.max_upload_bytes + 1)
     try:
@@ -112,15 +121,19 @@ async def upload_image(
     except ImageError as exc:
         raise ApiError(422, "invalid_image", str(exc)) from exc
     store = get_blob_store()
-    if row.image_blob:
-        try:
-            await store.delete(row.image_blob)
-        except Exception:
-            pass
+    old_blob = row.image_blob
     ext = "jpg" if media_type == "image/jpeg" else "png"
-    row.image_blob = await store.put(f"sessions/{row.id}/spectrum.{ext}", normalized, media_type)
-    row.image_media_type = media_type
+    try:
+        new_blob = await store.put(f"sessions/{row.id}/spectrum.{ext}", normalized, media_type)
+    except Exception as exc:
+        raise ApiError(502, "storage_unavailable", "Não foi possível salvar a imagem. Tente novamente.") from exc
+    row.image_blob, row.image_media_type = new_blob, media_type
     await repo.save(db, row)
+    if old_blob and old_blob != new_blob:
+        try:
+            await store.delete(old_blob)
+        except Exception:
+            pass  # orphaned blob is harmless; the session already points at the new one
     return {"ok": True, "media_type": media_type}
 
 

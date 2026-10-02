@@ -126,3 +126,34 @@ async def test_structure_check(client):
     assert bad.status_code == 422 and bad.json()["error"]["code"] == "invalid_smiles"
     s = (await client.get(f"/api/sessions/{sid}")).json()
     assert [p["smiles"] for p in s["chem_state"]["proposed_structures"]] == ["CCOC(C)=O", "CCOC(C)=O"]
+
+
+async def test_patch_keeps_existing_peak_ids(client):
+    sid = (await client.post("/api/sessions", json={"peaks": [{"id": "P1", "ppm": 4.12}, {"id": "P2", "ppm": 1.26}]})).json()["id"]
+    body = {"peaks": [{"id": "P1", "ppm": 4.12}, {"id": "P2", "ppm": 1.26}, {"id": "P3", "ppm": 7.26}]}
+    s = (await client.patch(f"/api/sessions/{sid}", json=body)).json()
+    assert {(p["id"], p["ppm"]) for p in s["peaks"]} == {("P1", 4.12), ("P2", 1.26), ("P3", 7.26)}
+    dup = await client.patch(f"/api/sessions/{sid}", json={"peaks": [{"id": "P1", "ppm": 1.0}, {"id": "P1", "ppm": 2.0}]})
+    assert dup.status_code == 422
+
+
+async def test_image_replace_rejected_after_conversation_and_put_before_delete(client, monkeypatch):
+    sid = (await client.post("/api/sessions", json={})).json()["id"]
+    assert (await client.post(f"/api/sessions/{sid}/image", files={"file": ("a.png", _png(), "image/png")})).status_code == 200
+    from app.store.blob import get_blob_store
+
+    store = get_blob_store()
+    before = dict(store.objects)
+
+    async def failing_put(*a, **k):
+        raise RuntimeError("blob down")
+
+    monkeypatch.setattr(store, "put", failing_put)
+    r = await client.post(f"/api/sessions/{sid}/image", files={"file": ("b.png", _png(), "image/png")})
+    assert r.status_code == 502 and r.json()["error"]["code"] == "storage_unavailable"
+    assert store.objects == before  # old image untouched when the new put fails
+    monkeypatch.undo()
+    assert (await client.get(f"/api/sessions/{sid}/image")).status_code == 200
+    await client.post(f"/api/sessions/{sid}/messages", json={"text": "Oi"})
+    r = await client.post(f"/api/sessions/{sid}/image", files={"file": ("c.png", _png(), "image/png")})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "image_locked"

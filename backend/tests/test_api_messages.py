@@ -81,3 +81,18 @@ async def test_message_validation(client, monkeypatch):
     assert res.status_code == 422 and res.json()["error"]["code"] == "empty_message"
     res = await client.post(f"/api/sessions/{sid}/messages", json={"text": "oi", "mode": "cheat"})
     assert res.status_code == 422
+
+
+async def test_ip_limit_is_separate_from_uid_limit(client, monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_PER_HOUR", "1")
+    monkeypatch.setenv("RATE_LIMIT_IP_PER_HOUR", "5")
+    get_settings.cache_clear()
+    import httpx
+
+    from app.main import create_app
+
+    for _ in range(3):  # three students (cookies) behind the same IP
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=create_app()), base_url="http://test") as other:
+            sid = (await other.post("/api/sessions", json={"exercise_id": "ex02"})).json()["id"]
+            assert (await other.post(f"/api/sessions/{sid}/messages", json={"text": "Oi"})).status_code == 200
+            assert (await other.post(f"/api/sessions/{sid}/messages", json={"text": "Oi"})).status_code == 429

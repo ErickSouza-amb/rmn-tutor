@@ -57,8 +57,12 @@ export function ChatPanel({
     setMessages((m) => [...m, { seq, role: "user", text, mode, created_at: new Date().toISOString() }]);
     setDraft({ text: "", tools: [] });
     let tools: string[] = [];
+    let finished = false;
+    let started = false;
     try {
       await api.sendMessage(session.id, text, mode, (ev) => {
+        started = true;
+        if (ev.event === "done" || ev.event === "error") finished = true;
         if (ev.event === "text_delta") setDraft((d) => (d ? { ...d, text: d.text + ev.data.text } : d));
         else if (ev.event === "tool_call") {
           tools = [...tools, ev.data.name];
@@ -70,7 +74,13 @@ export function ChatPanel({
           setLastTools(tools);
         } else if (ev.event === "error") setError(ev.data.message);
       });
+      if (!finished) setError("A resposta do tutor foi interrompida. Sua mensagem foi salva; tente reenviar.");
     } catch (err) {
+      if (!started) {
+        // rejected before the turn started (409/422/429): nothing was saved, so undo the optimistic bubble
+        setMessages((m) => m.filter((x) => !(x.seq === seq && x.role === "user")));
+        setInput(text);
+      }
       setError(err instanceof ApiError ? err.message : "Falha de conexão com o tutor.");
     } finally {
       setDraft(null);

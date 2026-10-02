@@ -49,4 +49,24 @@ describe("ChatPanel", () => {
     expect(await screen.findByText("O tutor ainda está respondendo.")).toBeInTheDocument();
     expect(screen.getByTestId("chat-input")).not.toBeDisabled();
   });
+
+  it("removes the optimistic message and restores the text when the request is rejected", async () => {
+    vi.spyOn(api, "sendMessage").mockRejectedValue(new ApiError(429, "rate_limited", "Muitas mensagens."));
+    render(<ChatPanel session={session} onStateChange={() => {}} onModeChange={() => {}} />);
+    await userEvent.type(screen.getByTestId("chat-input"), "Minha hipótese longa");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    expect(await screen.findByText("Muitas mensagens.")).toBeInTheDocument();
+    expect(screen.queryByText("Minha hipótese longa", { selector: "div" })).toBeNull();
+    expect(screen.getByTestId("chat-input")).toHaveValue("Minha hipótese longa");
+  });
+
+  it("reports a stream that ends without an answer", async () => {
+    vi.spyOn(api, "sendMessage").mockImplementation(async (_id, _t, _m, onEvent: (e: TurnEvent) => void) => {
+      onEvent({ event: "text_delta", data: { text: "Vou..." } });
+    });
+    render(<ChatPanel session={session} onStateChange={() => {}} onModeChange={() => {}} />);
+    await userEvent.type(screen.getByTestId("chat-input"), "Oi");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    expect(await screen.findByText(/resposta do tutor foi interrompida/)).toBeInTheDocument();
+  });
 });
