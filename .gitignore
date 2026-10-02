@@ -1,0 +1,25 @@
+# env / secrets
+.env
+.env.*
+!.env.example
+.vercel
+
+# node
+node_modules/
+.next/
+out/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# misc
+.DS_Store
+Thumbs.db
+playwright-report/
+test-results/
+coverage/
