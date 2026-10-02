@@ -36,3 +36,4 @@ frontend/.env*
 # executor scratch
 .superpowers/
 
+.env.local
